@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/core/app_export.dart';
 import 'package:myapp/widgets/custom_icon_button.dart';
-import 'package:image_picker/image_picker.dart'; // image_picker 패키지 가져오기
 import 'package:myapp/presentation/settings_screen/settings_screen.dart';
 import 'package:myapp/presentation/notifications/notifications.dart';
 import 'package:myapp/presentation/help&support/help&support.dart';
 import 'package:myapp/presentation/about/about.dart';
+import 'package:camera/camera.dart';
+import 'package:flutter_tflite/flutter_tflite.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:async';
 
 class FaceDetectionScreen extends StatefulWidget {
   const FaceDetectionScreen({Key? key}) : super(key: key);
@@ -15,18 +18,81 @@ class FaceDetectionScreen extends StatefulWidget {
 }
 
 class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
-  XFile? _image; //이미지를 담을 변수 선언
-  final ImagePicker picker = ImagePicker(); //ImagePicker 초기화
+  late CameraImage cameraImage;
+ late CameraController cameraController;
+ String result = "";
+ List<CameraDescription> cameras=[];
 
-  // 이미지를 가져오는 함수
-  Future getImage(ImageSource imageSource) async {
-    //pickedFile에 ImagePicker로 가져온 이미지가 담긴다.
-    final XFile? pickedFile = await picker.pickImage(source: imageSource);
-    if (pickedFile != null) {
+  Future<void> initCamera() async {
+    final cameras = await availableCameras();
+    cameraController = CameraController(cameras[1], ResolutionPreset.max);
+
+    try {
+      await cameraController.initialize();
+    } catch (e) {
+      print("Camera initialization error: $e");
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+
+    if (await Permission.camera.isGranted) {
+      cameraController.startImageStream((imageStream) {
+        runModel(imageStream);
+      });
+    } else {
+      var status = await Permission.camera.request();
+      if (status.isGranted) {
+        cameraController.startImageStream((imageStream) {
+          runModel(imageStream);
+        });
+      } else {
+        print("Camera permission denied");
+      }
+    }
+  }
+  void loadModel() async {
+    await Tflite.loadModel(
+        model: "assets/tflite/yolov.tflite",
+        labels: "assets/tflite/yolov.txt"
+    );
+  }
+
+  void runModel(CameraImage imageStream) async {
+    var recognitions = await Tflite.runModelOnFrame(
+      bytesList: imageStream.planes.map((plane) {
+        return plane.bytes;
+      }).toList(),
+      imageHeight: imageStream.height,
+      imageWidth: imageStream.width,
+      imageMean: 127.5,
+      imageStd: 127.5,
+      rotation: 90,
+      numResults: 2,
+      threshold: 0.1,
+      asynch: true,
+    );
+    if (recognitions != null && recognitions.isNotEmpty) {
       setState(() {
-        _image = pickedFile; //가져온 이미지를 _image에 저장
+        result = recognitions[0]["label"];
+        print(result);
       });
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    initCamera();
+    loadModel();
+  }
+
+  @override
+  void dispose() {
+    cameraController.dispose();
+    Tflite.close();
+    super.dispose();
   }
 
   @override
@@ -134,30 +200,27 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
                 ),
               ),
               Container(
-                height: getVerticalSize(283),
-                width: getHorizontalSize(246),
+                height: getVerticalSize(300),
+                width: getHorizontalSize(300),
                 margin: getMargin(top: 89),
                 decoration: AppDecoration.outline,
                 child: Stack(
                   children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.img3dfaceright2,
-                      height: getVerticalSize(283),
-                      width: getHorizontalSize(246),
-                      alignment: Alignment.center,
-                    )
+                Positioned.fill(
+                  child: cameraController.value.isInitialized
+                      ? AspectRatio(
+                    aspectRatio: cameraController.value.aspectRatio,
+                    child: CameraPreview(cameraController),
+                  )
+                      : Container(),
+
+                ),
+
                   ],
                 ),
               ),
-              Spacer(),
-              CustomIconButton(
-                height: 69,
-                width: 265,
-                onTap: () {
-                  _showImagePickerDialog(context); // 버튼을 누르면 이미지 선택 다이얼로그를 보여줍니다.
-                },
-                child: CustomImageView(),
-              )
+
+
             ],
           ),
         ),
@@ -165,28 +228,5 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     );
   }
 
-  void _showImagePickerDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('얼굴 인식'),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              getImage(ImageSource.camera); // getImage 함수를 호출해서 카메라로 찍은 사진 가져오기
-            },
-            child: Text('카메라'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              getImage(ImageSource.gallery); // getImage 함수를 호출해서 갤러리에서 사진 가져오기
-            },
-            child: Text('갤러리'),
-          ),
-        ],
-      ),
-    );
-  }
+
 }
