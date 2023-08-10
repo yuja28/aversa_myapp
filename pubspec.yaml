@@ -14,7 +14,8 @@ dependencies:
   cached_network_image: ^3.2.1
   flutter_svg: ^2.0.7
   intl: ^0.18.0
-  audioplayers: ^5.0.0
+  shared_preferences: ^2.2.0
+  just_audio: ^0.9.34
 
 
 dev_dependencies: 
@@ -26,6 +27,9 @@ flutter:
     - assets/
     - assets/images/
     - assets/mp3/
+    - assets/mp3/1_preview.wav
+    - assets/mp3/2-happy.wav
+    - assets/mp3/2_preview.wav
   fonts: 
     - family: Lato
       fonts: 

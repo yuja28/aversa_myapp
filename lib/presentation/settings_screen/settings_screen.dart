@@ -5,6 +5,7 @@ import 'package:myapp/widgets/custom_icon_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:myapp/routes/app_routes.dart';
 import 'package:myapp/presentation/menu_screen/menu_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SensitivityPopup extends StatefulWidget {
   final double currentSensitivity;
@@ -27,8 +28,25 @@ class _SensitivityPopupState extends State<SensitivityPopup> {
   @override
   void initState() {
     super.initState();
-    _currentSensitivity = widget.currentSensitivity;
+    _loadSensitivity();
   }
+
+  Future<void> _loadSensitivity() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    double savedSensitivity = prefs.getDouble('sensitivity') ?? widget.currentSensitivity;
+    setState(() {
+      _currentSensitivity = savedSensitivity;
+    });
+  }
+
+  Future<void> _savedSensitivity(double value) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('sensitivity', value);
+  }
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -54,8 +72,9 @@ class _SensitivityPopupState extends State<SensitivityPopup> {
       ),
       actions: [
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async{
             // 민감도 값을 저장하고 팝업창 닫기.
+            await _savedSensitivity(_currentSensitivity);
             Navigator.pop(context, _currentSensitivity);
           },
           child: Text("저장"),
@@ -121,10 +140,10 @@ class SettingsScreen extends StatelessWidget {
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => MenuScreen()),
+                            context,
+                            MaterialPageRoute(builder: (context) => MenuScreen()),
                           );
-                          },
+                        },
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,38 +222,47 @@ class SettingsScreen extends StatelessWidget {
                               }
                             });
                           },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              height: getSize(30),
-                              width: getSize(30),
-                              margin: getMargin(bottom: 3),
-                              decoration: BoxDecoration(
-                                color: appTheme.lightBlue300,
-                                borderRadius: BorderRadius.circular(
-                                  getHorizontalSize(6),
-                                ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                  height: getSize(30),
+                                  width: getSize(30),
+                                  margin: getMargin(bottom: 3),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.lightBlue300,
+                                    borderRadius: BorderRadius.circular(
+                                      getHorizontalSize(6),
+                                    ),
+                                  ),
+                                  child: Center(
+                                      child: Icon(
+                                        Icons.touch_app,
+                                        color: Colors.white,
+                                      )
+                                  )
                               ),
-                              child: Center(
-                                child: Icon(
-                                  Icons.touch_app,
-                                  color: Colors.white,
-                                )
-                              )
-                            ),
-                            SizedBox(width: 20), // 텍스트와 아이콘 사이에 간격을 주기 위해 사용
-                            Text(
-                              "민감도 설정",
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.left,
-                              style: CustomTextStyles.titleSmallRobotoBlack900,
-                            ),
-                            Spacer(),
-                          ],
+                              SizedBox(width: 20), // 텍스트와 아이콘 사이에 간격을 주기 위해 사용
+                              Text(
+                                "민감도 설정",
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.left,
+                                style: CustomTextStyles.titleSmallRobotoBlack900,
+                              ),
+                              Spacer(),
+                              CustomImageView(
+                                svgPath: ImageConstant.imgArrowright,
+                                height: getVerticalSize(14),
+                                width: getHorizontalSize(7),
+                                onTap: () {
+                                  // 화살표 아이콘 클릭 처리 함수를 호출합니다.
+                                  onTapArrowIcon(context);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
                       )],
                   ),
                 ),
@@ -263,6 +291,17 @@ class SettingsScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => MenuScreen(),
+      ),
+    );
+  }
+
+  onTapArrowIcon(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => SensitivityPopup(
+        currentSensitivity: 0.5, // 현재 민감도 값을 여기에 제공합니다.
+        minSensitivity: 0.0,
+        maxSensitivity: 1.0,
       ),
     );
   }
